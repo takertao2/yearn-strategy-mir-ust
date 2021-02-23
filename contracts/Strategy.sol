@@ -313,7 +313,7 @@ contract Strategy is BaseStrategy {
             uint256(1),
             pathToSwap,
             address(this),
-            now + 180
+            now
         ); // swap MM to UST
 
         uint256 ustAmount = IERC20(ust).balanceOf(address(this));
@@ -334,7 +334,7 @@ contract Strategy is BaseStrategy {
             0,
             path,
             address(this),
-            now + 180
+            now
         );
 
         (uint256 amountA, uint256 amountB, uint256 LP) =
