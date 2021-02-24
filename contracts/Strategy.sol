@@ -31,7 +31,7 @@ contract Strategy is BaseStrategy {
     using SafeMath for uint256;
 
     event DepoistedOnMMFarmingPool(uint256 amount);
-    event Debug(uint256 want, uint256 debt);
+    event ProfitDetails(uint256 appreciation, uint256 sellingMushroom);
 
     address public constant unirouter =
         address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
@@ -94,6 +94,8 @@ contract Strategy is BaseStrategy {
             uint256 _debtPayment
         )
     {
+        StrategyParams memory params = vault.strategies(address(this));
+
         // Pay debt if any
         if (_debtOutstanding > 0) {
             (uint256 _amountFreed, uint256 _reportLoss) =
@@ -105,7 +107,18 @@ contract Strategy is BaseStrategy {
         }
 
         // Claim profit
-        _profit = claimMM();
+        _profit = 0;
+        uint256 total = estimatedTotalAssets();
+
+        if (total > params.totalDebt) {
+            _profit = total.sub(params.totalDebt);
+            liquidatePosition(_profit);
+        }
+
+        uint256 claimed = claimMM();
+        emit ProfitDetails(_profit, claimed);
+
+        _profit += claimed;
         return (_profit, _loss, _debtPayment);
     }
 
@@ -118,8 +131,6 @@ contract Strategy is BaseStrategy {
         uint256 _before = IERC20(mmVault).balanceOf(address(this));
         uint256 _after = _before;
         uint256 _want = want.balanceOf(address(this));
-
-        emit Debug(_want, _debtOutstanding);
 
         if (_want > _debtOutstanding) {
             _want = _want.sub(_debtOutstanding);
@@ -348,8 +359,6 @@ contract Strategy is BaseStrategy {
                 address(this),
                 now + 60
             );
-
-        emit Debug(123, LP);
 
         return LP;
     }

@@ -139,3 +139,13 @@ def strategy(strategist, keeper, vault, Strategy, gov):
         {"from": strategist},
     )
     yield strategy
+
+
+@pytest.fixture
+def underlying_vault_strategy():
+    yield Contract("0x0a625d31ebf6e8a93c54911075b00de881549b92")
+
+
+@pytest.fixture
+def underlying_vault_strategy_strategist(accounts, underlying_vault_strategy):
+    yield accounts.at(underlying_vault_strategy.strategist(), force=True)

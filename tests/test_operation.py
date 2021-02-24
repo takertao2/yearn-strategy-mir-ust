@@ -36,7 +36,16 @@ def test_emergency_exit(accounts, token, vault, strategy, strategist, amount):
     assert strategy.estimatedTotalAssets() < amount
 
 
-def test_profitable_harvest(accounts, token, vault, strategy, strategist, amount):
+def test_profitable_harvest(
+    accounts,
+    token,
+    vault,
+    strategy,
+    strategist,
+    amount,
+    underlying_vault_strategy,
+    underlying_vault_strategy_strategist,
+):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": accounts[0]})
     vault.deposit(amount, {"from": accounts[0]})
@@ -47,9 +56,15 @@ def test_profitable_harvest(accounts, token, vault, strategy, strategist, amount
     assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
 
     chain.sleep(3600 * 24 * 30)
+    # Fist harvest the underlying strategy
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
     strategy.harvest()
 
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+
     assert token.balanceOf(vault.address) > 0
+
+    assert 12 == 45
 
 
 def test_change_debt(gov, token, vault, strategy, strategist, amount):
