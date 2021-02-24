@@ -64,8 +64,6 @@ def test_profitable_harvest(
 
     assert token.balanceOf(vault.address) > 0
 
-    assert 12 == 45
-
 
 def test_change_debt(gov, token, vault, strategy, strategist, amount):
     # Deposit to the vault and harvest

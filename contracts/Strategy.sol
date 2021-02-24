@@ -115,6 +115,10 @@ contract Strategy is BaseStrategy {
             liquidatePosition(_profit);
         }
 
+        if (params.totalDebt > total) {
+            _loss = params.totalDebt.sub(total);
+        }
+
         uint256 claimed = claimMM();
         emit ProfitDetails(_profit, claimed);
 
