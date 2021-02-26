@@ -2,6 +2,7 @@ import brownie
 from brownie import Contract
 from brownie import chain
 import pytest
+from brownie import chain
 
 
 def test_operation(accounts, token, vault, strategy, strategist, amount):
@@ -108,12 +109,62 @@ def test_sweep(gov, vault, strategy, token, amount, weth, weth_amout):
     assert weth.balanceOf(gov) == weth_amout
 
 
-def test_triggers(gov, vault, strategy, token, amount, weth, weth_amout):
+def test_triggers(
+    gov,
+    vault,
+    strategy,
+    token,
+    amount,
+    weth,
+    weth_amout,
+    underlying_vault_strategy,
+    underlying_vault_strategy_strategist,
+):
     # Deposit to the vault and harvest
     token.approve(vault.address, amount, {"from": gov})
     vault.deposit(amount, {"from": gov})
-    vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
     strategy.harvest()
 
-    strategy.harvestTrigger(0)
-    strategy.tendTrigger(0)
+    strategy.setDebtThreshold(10 ** (token.decimals() - 2))
+    strategy.setMaxReportDelay(3600 * 24 * 60)
+
+    chain.sleep(1)
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
+
+    assert False == strategy.harvestTrigger("0.01 ether")
+    chain.sleep(3600 * 24 * 30)
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
+
+    assert False == strategy.harvestTrigger("0.01 ether")
+    assert True == strategy.harvestTrigger("0.001 ether")
+
+
+def test_report_apy(
+    gov,
+    vault,
+    strategy,
+    token,
+    amount,
+    weth,
+    weth_amout,
+    underlying_vault_strategy,
+    underlying_vault_strategy_strategist,
+):
+    token.approve(vault.address, amount, {"from": gov})
+    vault.deposit(amount, {"from": gov})
+
+    for x in range(0, 4):
+        chain.sleep(3600 * 24 * 7)
+        underlying_vault_strategy.harvest(
+            {"from": underlying_vault_strategy_strategist}
+        )
+        strategy.harvest({"from": gov})
+
+    amountAfter = vault.totalDebt() + token.balanceOf(vault)
+
+    print(
+        f"APR calculated over a month without componding: { (((amountAfter - amount) / amount * 100 * 12))}"
+    )
+    print(
+        f"APR calculated over a month, with  componding: { (1 + ((amountAfter - amount) / amount)) ** 12 * 100}"
+    )

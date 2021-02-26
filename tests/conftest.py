@@ -52,7 +52,7 @@ def token():
 def ust(accounts, uniswap):
     token_address = "0xa47c8bf37f92abed4a126bda807a7b7498661acd"
     ust = Contract(token_address)
-    amount = 2_000 * (10 ** ust.decimals())
+    amount = 20_000 * (10 ** ust.decimals())
     reserve = accounts.at("0xa1d8d972560c2f8144af871db508f0b0b10a3fbf", force=True)
     ust.transfer(accounts[0], amount, {"from": reserve})
     ust.approve(uniswap, amount, {"from": accounts[0]})
@@ -64,7 +64,7 @@ def ust(accounts, uniswap):
 def mir(accounts, uniswap):
     token_address = "0x09a3ecafa817268f77be1283176b946c4ff2e608"
     mir = Contract(token_address)
-    amount = 100 * (10 ** mir.decimals())
+    amount = 1000 * (10 ** mir.decimals())
     reserve = accounts.at("0xa1d8d972560c2f8144af871db508f0b0b10a3fbf", force=True)
     mir.transfer(accounts[0], amount, {"from": reserve})
     mir.approve(uniswap, amount, {"from": accounts[0]})
@@ -77,7 +77,7 @@ def amount(accounts, token, mir, ust, uniswap):
     mir_price = uniswap.getAmountsOut(1 * 10 ** mir.decimals(), [mir, ust])[1]
 
     timestamp = chain.time() + 10
-    amount = 100
+    amount = 1000
     amount_mir = amount * (10 ** mir.decimals())
     amount_ust = amount * mir_price  # mir and ust are 18 decimals
 

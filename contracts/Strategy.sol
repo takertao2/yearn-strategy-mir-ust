@@ -48,6 +48,10 @@ contract Strategy is BaseStrategy {
         address(0x09a3EcAFa817268f77BE1283176B946C4ff2E608);
     address public constant ust =
         address(0xa47c8bf37f92aBed4A126BDA807A7b7498661acD);
+    address public constant usdt =
+        address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    address public constant weth =
+        address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     uint256 public minMMToSwap = 10; // min $MM to swap during adjustPosition()
     address[] private pathToSwap;
@@ -96,26 +100,21 @@ contract Strategy is BaseStrategy {
     {
         StrategyParams memory params = vault.strategies(address(this));
 
-        // Pay debt if any
-        if (_debtOutstanding > 0) {
-            (uint256 _amountFreed, uint256 _reportLoss) =
-                liquidatePosition(_debtOutstanding);
-            _debtPayment = _amountFreed > _debtOutstanding
-                ? _debtOutstanding
-                : _amountFreed;
-            _loss = _reportLoss;
-        }
-
-        // Claim profit
         _profit = 0;
         uint256 total = estimatedTotalAssets();
 
-        if (total > params.totalDebt) {
-            _profit = total.sub(params.totalDebt);
-            liquidatePosition(_profit);
-        }
+        if (_debtOutstanding > 0 || total > params.totalDebt) {
+            if (total > params.totalDebt) _profit = total.sub(params.totalDebt);
+            (uint256 _amountFreed, uint256 _reportLoss) =
+                liquidatePosition(_profit + _debtOutstanding);
+            _amountFreed -= _profit;
 
-        if (params.totalDebt > total) {
+            _debtPayment = _amountFreed > _debtOutstanding
+                ? _debtOutstanding
+                : _amountFreed;
+
+            _loss = _reportLoss;
+        } else {
             _loss = params.totalDebt.sub(total);
         }
 
@@ -143,11 +142,7 @@ contract Strategy is BaseStrategy {
 
             _after = IERC20(mmVault).balanceOf(address(this));
             require(_after > _before, "!mismatchDepositIntoMushrooms");
-        } else if (_debtOutstanding > _want) {
-            return;
         }
-
-        emit DepoistedOnMMFarmingPool(_after);
 
         if (_after > 0) {
             MMFarmingPool(mmFarmingPool).deposit(mmFarmingPoolId, _after);
@@ -262,13 +257,44 @@ contract Strategy is BaseStrategy {
         // Trigger if we have a loss to report
         if (total.add(debtThreshold) < params.totalDebt) return true;
 
-        uint256 profit = 0;
-        if (total > params.totalDebt) profit = total.sub(params.totalDebt); // We've earned a profit!
+        uint256 profit = profit();
+
+        if (profit > 0) {
+            callCost = convertEthToWant(callCost);
+        }
 
         // Otherwise, only trigger if it "makes sense" economically (gas cost
         // is <N% of value moved)
         uint256 credit = vault.creditAvailable();
         return (profitFactor.mul(callCost) < credit.add(profit));
+    }
+
+    function profit() public view returns (uint256 _profit) {
+        _profit = 0;
+        uint256 total = estimatedTotalAssets();
+
+        StrategyParams memory params = vault.strategies(address(this));
+        if (total > params.totalDebt) {
+            _profit = total.sub(params.totalDebt); // We've earned a profit!
+        }
+    }
+
+    function convertEthToWant(uint256 amount) public view returns (uint256) {
+        address[] memory path = new address[](3);
+        path[0] = weth;
+        path[1] = usdt;
+        path[2] = ust;
+
+        uint256 ustAmount =
+            IUniswapV2Router02(unirouter).getAmountsOut(amount, path)[2];
+
+        (, uint256 ustReserve, ) = IUniswapV2Pair(address(want)).getReserves();
+
+        uint256 ustLeft =
+            ustAmount - calculateSwapInAmount(ustReserve, ustAmount);
+        // we estimate the amount of want
+        uint256 totalSupply = IUniswapV2Pair(address(want)).totalSupply();
+        return (ustLeft * totalSupply) / ustReserve;
     }
 
     function prepareMigration(address _newStrategy) internal override {
@@ -361,7 +387,7 @@ contract Strategy is BaseStrategy {
                 1,
                 1,
                 address(this),
-                now + 60
+                now
             );
 
         return LP;

@@ -37,6 +37,8 @@ interface IUniswapV2Pair {
 
     function token1() external pure returns (address);
 
+    function totalSupply() external view returns (uint256);
+
     function getReserves()
         external
         view
