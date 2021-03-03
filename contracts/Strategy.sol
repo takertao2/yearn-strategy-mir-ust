@@ -30,9 +30,6 @@ contract Strategy is BaseStrategy {
     using Address for address;
     using SafeMath for uint256;
 
-    event DepoistedOnMMFarmingPool(uint256 amount);
-    event ProfitDetails(uint256 appreciation, uint256 sellingMushroom);
-
     address public constant unirouter =
         address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
@@ -100,7 +97,6 @@ contract Strategy is BaseStrategy {
     {
         StrategyParams memory params = vault.strategies(address(this));
 
-        _profit = 0;
         uint256 total = estimatedTotalAssets();
 
         if (_debtOutstanding > 0 || total > params.totalDebt) {
@@ -119,8 +115,6 @@ contract Strategy is BaseStrategy {
         }
 
         uint256 claimed = claimMM();
-        emit ProfitDetails(_profit, claimed);
-
         _profit += claimed;
         return (_profit, _loss, _debtPayment);
     }
@@ -141,12 +135,10 @@ contract Strategy is BaseStrategy {
             MMVault(mmVault).deposit(_want);
 
             _after = IERC20(mmVault).balanceOf(address(this));
-            require(_after > _before, "!mismatchDepositIntoMushrooms");
         }
 
         if (_after > 0) {
             MMFarmingPool(mmFarmingPool).deposit(mmFarmingPoolId, _after);
-            emit DepoistedOnMMFarmingPool(_after);
         }
     }
 
@@ -165,64 +157,53 @@ contract Strategy is BaseStrategy {
     function liquidatePosition(uint256 _amountNeeded)
         internal
         override
-        returns (uint256 _liquidatedAmount, uint256 _loss)
+        returns (uint256, uint256)
     {
-        bool liquidateAll =
-            _amountNeeded >= estimatedTotalAssets() ? true : false;
+        uint256 _liquidatedAmount;
+        uint256 _loss;
+        uint256 totalAssets = estimatedTotalAssets();
 
-        if (liquidateAll) {
-            (uint256 _mToken, ) =
-                MMFarmingPool(mmFarmingPool).userInfo(
-                    mmFarmingPoolId,
-                    address(this)
-                );
-            MMFarmingPool(mmFarmingPool).withdraw(mmFarmingPoolId, _mToken);
-            MMVault(mmVault).withdraw(IERC20(mmVault).balanceOf(address(this)));
-            _liquidatedAmount = IERC20(want).balanceOf(address(this));
-            return (
-                _liquidatedAmount,
-                _liquidatedAmount < vault.strategies(address(this)).totalDebt
-                    ? vault.strategies(address(this)).totalDebt.sub(
-                        _liquidatedAmount
-                    )
-                    : 0
-            );
+        if (_amountNeeded > totalAssets) {
+            _liquidatedAmount = totalAssets;
+            _loss = _amountNeeded.sub(totalAssets);
         } else {
-            uint256 _before = IERC20(want).balanceOf(address(this));
-            if (_before < _amountNeeded) {
-                uint256 _gap = _amountNeeded.sub(_before);
-                uint256 _mShare =
-                    _gap.mul(1e18).div(MMVault(mmVault).getRatio());
-
-                uint256 _mmVault = IERC20(mmVault).balanceOf(address(this));
-                if (_mmVault < _mShare) {
-                    uint256 _mvGap = _mShare.sub(_mmVault);
-                    (uint256 _mToken, ) =
-                        MMFarmingPool(mmFarmingPool).userInfo(
-                            mmFarmingPoolId,
-                            address(this)
-                        );
-                    require(
-                        _mToken >= _mvGap,
-                        "!insufficientMTokenInMasterChef"
-                    );
-                    MMFarmingPool(mmFarmingPool).withdraw(
-                        mmFarmingPoolId,
-                        _mvGap
-                    );
-                }
-                MMVault(mmVault).withdraw(_mShare);
-                uint256 _after = IERC20(want).balanceOf(address(this));
-                require(_after > _before, "!mismatchMushroomsVaultWithdraw");
-
-                return (
-                    _after,
-                    _amountNeeded > _after ? _amountNeeded.sub(_after) : 0
-                );
-            } else {
-                return (_amountNeeded, _loss);
-            }
+            _liquidatedAmount = _amountNeeded;
         }
+
+        uint256 _before = IERC20(want).balanceOf(address(this));
+        if (_before < _liquidatedAmount) {
+            uint256 _gap = _liquidatedAmount.sub(_before);
+            uint256 _mShare = _gap.mul(1e18).div(MMVault(mmVault).getRatio());
+
+            uint256 _mmVault = IERC20(mmVault).balanceOf(address(this));
+            if (_mmVault < _mShare) {
+                uint256 _mvGap = _mShare.sub(_mmVault);
+                (uint256 _mTokenBalance, ) =
+                    MMFarmingPool(mmFarmingPool).userInfo(
+                        mmFarmingPoolId,
+                        address(this)
+                    );
+                if (_mTokenBalance < _mvGap) {
+                    _mvGap = _mTokenBalance;
+                }
+
+                MMFarmingPool(mmFarmingPool).withdraw(mmFarmingPoolId, _mvGap);
+            }
+            uint256 mmVaultBalance = MMVault(mmVault).balanceOf(address(this));
+
+            if (mmVaultBalance < _mShare) {
+                _mShare = mmVaultBalance;
+            }
+
+            MMVault(mmVault).withdraw(_mShare);
+            uint256 _after = IERC20(want).balanceOf(address(this));
+            return (
+                _after,
+                _amountNeeded > _after ? _amountNeeded.sub(_after) : 0
+            );
+        }
+
+        return (_liquidatedAmount, _loss);
     }
 
     function harvestTrigger(uint256 callCost)
@@ -270,7 +251,6 @@ contract Strategy is BaseStrategy {
     }
 
     function profit() public view returns (uint256 _profit) {
-        _profit = 0;
         uint256 total = estimatedTotalAssets();
 
         StrategyParams memory params = vault.strategies(address(this));
@@ -305,9 +285,9 @@ contract Strategy is BaseStrategy {
             );
         MMFarmingPool(mmFarmingPool).withdraw(mmFarmingPoolId, _mToken);
 
-        uint256 _mmVault = IERC20(mmVault).balanceOf(address(this));
-        if (_mmVault > 0) {
-            IERC20(mmVault).safeTransfer(_newStrategy, _mmVault);
+        uint256 _mmVaultBalance = IERC20(mmVault).balanceOf(address(this));
+        if (_mmVaultBalance > 0) {
+            IERC20(mmVault).safeTransfer(_newStrategy, _mmVaultBalance);
         }
 
         uint256 _mm = IERC20(mm).balanceOf(address(this));
