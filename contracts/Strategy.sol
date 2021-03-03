@@ -97,24 +97,25 @@ contract Strategy is BaseStrategy {
     {
         StrategyParams memory params = vault.strategies(address(this));
 
-        uint256 total = estimatedTotalAssets();
-
-        if (_debtOutstanding > 0 || total > params.totalDebt) {
-            if (total > params.totalDebt) _profit = total.sub(params.totalDebt);
+        // Pay debt if any
+        if (_debtOutstanding > 0) {
             (uint256 _amountFreed, uint256 _reportLoss) =
-                liquidatePosition(_profit + _debtOutstanding);
-            _amountFreed -= _profit;
-
+                liquidatePosition(_debtOutstanding);
             _debtPayment = _amountFreed > _debtOutstanding
                 ? _debtOutstanding
                 : _amountFreed;
-
             _loss = _reportLoss;
-        } else {
-            _loss = params.totalDebt.sub(total);
+        }
+
+        uint256 total = estimatedTotalAssets();
+
+        if (total > params.totalDebt) {
+            _profit = total.sub(params.totalDebt);
+            (_profit, ) = liquidatePosition(_profit);
         }
 
         uint256 claimed = claimMM();
+
         _profit += claimed;
         return (_profit, _loss, _debtPayment);
     }
@@ -189,10 +190,10 @@ contract Strategy is BaseStrategy {
 
                 MMFarmingPool(mmFarmingPool).withdraw(mmFarmingPoolId, _mvGap);
             }
-            uint256 mmVaultBalance = MMVault(mmVault).balanceOf(address(this));
+            uint256 _mmVaultBalance = MMVault(mmVault).balanceOf(address(this));
 
-            if (mmVaultBalance < _mShare) {
-                _mShare = mmVaultBalance;
+            if (_mmVaultBalance < _mShare) {
+                _mShare = _mmVaultBalance;
             }
 
             MMVault(mmVault).withdraw(_mShare);

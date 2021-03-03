@@ -53,7 +53,7 @@ def ust(accounts, uniswap):
     token_address = "0xa47c8bf37f92abed4a126bda807a7b7498661acd"
     ust = Contract(token_address)
     amount = 20_000 * (10 ** ust.decimals())
-    reserve = accounts.at("0x77645329c920870C84167fdf5C0Db152733ad2eE", force=True)
+    reserve = accounts.at("0xa1D8d972560C2f8144AF871Db508F0B0B10a3fBf", force=True)
     ust.transfer(accounts[0], amount, {"from": reserve})
     ust.approve(uniswap, amount, {"from": accounts[0]})
 
