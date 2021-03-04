@@ -131,11 +131,11 @@ def test_triggers(
     chain.sleep(1)
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
 
-    assert False == strategy.harvestTrigger("0.01 ether")
+    assert False == strategy.harvestTrigger("0.1 ether")
     chain.sleep(3600 * 24 * 30)
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
 
-    assert False == strategy.harvestTrigger("0.01 ether")
+    assert False == strategy.harvestTrigger("0.1 ether")
     assert True == strategy.harvestTrigger("0.001 ether")
 
 

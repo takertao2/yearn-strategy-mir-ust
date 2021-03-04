@@ -49,27 +49,50 @@ def token():
 
 
 @pytest.fixture
-def ust(accounts, uniswap):
+def ust(accounts, uniswap, usdt):
     token_address = "0xa47c8bf37f92abed4a126bda807a7b7498661acd"
     ust = Contract(token_address)
     amount = 20_000 * (10 ** ust.decimals())
-    reserve = accounts.at("0xa1D8d972560C2f8144AF871Db508F0B0B10a3fBf", force=True)
-    ust.transfer(accounts[0], amount, {"from": reserve})
+    uniswap.swapTokensForExactTokens(
+        amount,
+        200_000 * 10 ** usdt.decimals(),
+        [usdt, ust],
+        accounts[0],
+        chain.time() + 10,
+        {"from": accounts[0]},
+    )
     ust.approve(uniswap, amount, {"from": accounts[0]})
-
     yield ust
 
 
 @pytest.fixture
-def mir(accounts, uniswap):
+def mir(accounts, uniswap, usdt, weth):
     token_address = "0x09a3ecafa817268f77be1283176b946c4ff2e608"
     mir = Contract(token_address)
     amount = 1000 * (10 ** mir.decimals())
-    reserve = accounts.at("0xa1d8d972560c2f8144af871db508f0b0b10a3fbf", force=True)
-    mir.transfer(accounts[0], amount, {"from": reserve})
+    uniswap.swapTokensForExactTokens(
+        amount,
+        200_000 * 10 ** usdt.decimals(),
+        [usdt, weth, mir],
+        accounts[0],
+        chain.time() + 10,
+        {"from": accounts[0]},
+    )
     mir.approve(uniswap, amount, {"from": accounts[0]})
 
     yield mir
+
+
+@pytest.fixture
+def usdt(accounts, uniswap):
+    token_address = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+    usdt = Contract(token_address)
+    reserve = accounts.at("0x3f5CE5FBFe3E9af3971dD833D26bA9b5C936f0bE", force=True)
+    amount = 200_000 * 10 ** usdt.decimals()
+    usdt.transfer(accounts[0], amount, {"from": reserve})
+    usdt.approve(uniswap, amount, {"from": accounts[0]})
+
+    yield usdt
 
 
 @pytest.fixture
