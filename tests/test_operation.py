@@ -5,7 +5,16 @@ import pytest
 from brownie import chain
 
 
-def test_operation(accounts, token, vault, strategy, strategist, amount):
+def test_operation(
+    accounts,
+    token,
+    vault,
+    strategy,
+    strategist,
+    amount,
+    underlying_vault_strategy,
+    underlying_vault_strategy_strategist,
+):
     # Deposit to the vault
     token.approve(vault.address, amount, {"from": accounts[0]})
     vault.deposit(amount, {"from": accounts[0]})
@@ -13,14 +22,17 @@ def test_operation(accounts, token, vault, strategy, strategist, amount):
 
     # harvest
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
+    chain.sleep(3600 * 24)
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
+    strategy.harvest()
 
-    # tend()
     strategy.tend()
 
     # withdrawal
     vault.withdraw({"from": accounts[0]})
-    assert pytest.approx(token.balanceOf(accounts[0]), rel=1e-5) == amount
+    assert pytest.approx(token.balanceOf(accounts[0]), rel=4 * 1e-3) == amount
 
 
 def test_emergency_exit(accounts, token, vault, strategy, strategist, amount):
@@ -28,7 +40,7 @@ def test_emergency_exit(accounts, token, vault, strategy, strategist, amount):
     token.approve(vault.address, amount, {"from": accounts[0]})
     vault.deposit(amount, {"from": accounts[0]})
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
 
     # set emergency and exit
     strategy.setEmergencyExit()
@@ -54,14 +66,15 @@ def test_profitable_harvest(
 
     # harvest
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+    underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
 
     chain.sleep(3600 * 24 * 30)
     # Fist harvest the underlying strategy
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
     strategy.harvest()
 
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
 
     assert token.balanceOf(vault.address) > 0
 
@@ -74,16 +87,16 @@ def test_change_debt(gov, token, vault, strategy, strategist, amount):
     strategy.harvest()
     half = int(amount / 2)
 
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == half
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == half
 
     vault.updateStrategyDebtRatio(strategy.address, 10_000, {"from": gov})
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == amount
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
 
     # In order to pass this tests, you will need to implement prepareReturn.
     vault.updateStrategyDebtRatio(strategy.address, 5_000, {"from": gov})
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=1e-5) == half
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == half
 
 
 def test_sweep(gov, vault, strategy, token, amount, weth, weth_amout):
@@ -126,7 +139,9 @@ def test_triggers(
     strategy.harvest()
 
     strategy.setDebtThreshold(10 ** (token.decimals() - 2))
+
     strategy.setMaxReportDelay(3600 * 24 * 60)
+    strategy.setMinReportDelay(3600 * 24)
 
     chain.sleep(1)
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})

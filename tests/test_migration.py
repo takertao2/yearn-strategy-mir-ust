@@ -9,9 +9,9 @@ def test_migration(token, vault, strategy, amount, Strategy, strategist, gov):
     token.approve(vault.address, amount, {"from": gov})
     vault.deposit(amount, {"from": gov})
     strategy.harvest()
-    assert pytest.approx(strategy.estimatedTotalAssets(), abs=100) == amount
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
 
     # migrate to a new strategy
     new_strategy = strategist.deploy(Strategy, vault)
     strategy.migrate(new_strategy.address, {"from": gov})
-    assert pytest.approx(new_strategy.estimatedTotalAssets(), abs=100) == amount
+    assert pytest.approx(new_strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount

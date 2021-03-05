@@ -318,7 +318,7 @@ contract Strategy is BaseStrategy {
             return 0;
         }
         uint256 _wantInVault = MMVault(mmVault).balance();
-        return (_wantInVault.mul(_shares)).div(_mTokenTotal);
+        return (_wantInVault.mul(_shares)).div(_mTokenTotal).mul(998).div(1000);
     }
 
     function _disposeOfMM() internal returns (uint256) {
