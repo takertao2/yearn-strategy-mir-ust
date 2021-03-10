@@ -105,18 +105,16 @@ contract Strategy is BaseStrategy {
                 ? _debtOutstanding
                 : _amountFreed;
             _loss = _reportLoss;
+        } else {
+            uint256 total = estimatedTotalAssets();
+
+            if (total > params.totalDebt) {
+                _profit = total.sub(params.totalDebt);
+                liquidatePosition(_profit);
+            }
+
+            _profit = IERC20(want).balanceOf(address(this));
         }
-
-        uint256 total = estimatedTotalAssets();
-
-        if (total > params.totalDebt) {
-            _profit = total.sub(params.totalDebt);
-            (_profit, ) = liquidatePosition(_profit);
-        }
-
-        uint256 claimed = claimMM();
-
-        _profit += claimed;
         return (_profit, _loss, _debtPayment);
     }
 
@@ -126,20 +124,18 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        uint256 _before = IERC20(mmVault).balanceOf(address(this));
-        uint256 _after = _before;
+        uint256 _after;
         uint256 _want = want.balanceOf(address(this));
 
         if (_want > _debtOutstanding) {
             _want = _want.sub(_debtOutstanding);
 
             MMVault(mmVault).deposit(_want);
-
-            _after = IERC20(mmVault).balanceOf(address(this));
         }
 
-        if (_after > 0) {
-            MMFarmingPool(mmFarmingPool).deposit(mmFarmingPoolId, _after);
+        uint256 mmBalance = IERC20(mmVault).balanceOf(address(this));
+        if (mmBalance > 0) {
+            MMFarmingPool(mmFarmingPool).deposit(mmFarmingPoolId, mmBalance);
         }
     }
 
@@ -269,6 +265,10 @@ contract Strategy is BaseStrategy {
         uint256 ustAmount =
             IUniswapV2Router02(unirouter).getAmountsOut(amount, path)[2];
 
+        if (ustAmount == 0) {
+            return uint256(-1);
+        }
+
         (, uint256 ustReserve, ) = IUniswapV2Pair(address(want)).getReserves();
 
         uint256 ustLeft =
@@ -318,6 +318,7 @@ contract Strategy is BaseStrategy {
             return 0;
         }
         uint256 _wantInVault = MMVault(mmVault).balance();
+
         return (_wantInVault.mul(_shares)).div(_mTokenTotal).mul(998).div(1000);
     }
 
