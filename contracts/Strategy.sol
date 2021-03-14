@@ -109,9 +109,10 @@ contract Strategy is BaseStrategy {
             uint256 total = estimatedTotalAssets();
 
             if (total > params.totalDebt) {
-                _profit = total.sub(params.totalDebt);
-                liquidatePosition(_profit);
+                liquidatePosition(total.sub(params.totalDebt));
             }
+
+            claimMM();
 
             _profit = IERC20(want).balanceOf(address(this));
         }
