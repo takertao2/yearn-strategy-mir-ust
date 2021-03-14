@@ -67,7 +67,7 @@ def test_profitable_harvest(
     # harvest
     strategy.harvest()
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
+    assert strategy.estimatedTotalAssets() > amount
 
     chain.sleep(3600 * 24 * 30)
     # Fist harvest the underlying strategy
