@@ -125,7 +125,6 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        uint256 _after;
         uint256 _want = want.balanceOf(address(this));
 
         if (_want > _debtOutstanding) {
