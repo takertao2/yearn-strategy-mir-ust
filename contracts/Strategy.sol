@@ -209,42 +209,8 @@ contract Strategy is BaseStrategy {
         override
         returns (bool)
     {
-        StrategyParams memory params = vault.strategies(address(this));
-
-        // Should not trigger if Strategy is not activated
-        if (params.activation == 0) return false;
-
-        // Should not trigger if we haven't waited long enough since previous harvest
-        if (block.timestamp.sub(params.lastReport) < minReportDelay)
-            return false;
-
-        // Should trigger if hasn't been called in a while
-        if (block.timestamp.sub(params.lastReport) >= maxReportDelay)
-            return true;
-
-        // If some amount is owed, pay it back
-        // NOTE: Since debt is based on deposits, it makes sense to guard against large
-        //       changes to the value from triggering a harvest directly through user
-        //       behavior. This should ensure reasonable resistance to manipulation
-        //       from user-initiated withdrawals as the outstanding debt fluctuates.
-        uint256 outstanding = vault.debtOutstanding();
-        if (outstanding > debtThreshold) return true;
-
-        // Check for profits and losses
-        uint256 total = estimatedTotalAssets();
-        // Trigger if we have a loss to report
-        if (total.add(debtThreshold) < params.totalDebt) return true;
-
-        uint256 profit = profit();
-
-        if (profit > 0) {
-            callCost = convertEthToWant(callCost);
-        }
-
-        // Otherwise, only trigger if it "makes sense" economically (gas cost
-        // is <N% of value moved)
-        uint256 credit = vault.creditAvailable();
-        return (profitFactor.mul(callCost) < credit.add(profit));
+        callCost = convertEthToWant(callCost);
+        return super.harvestTrigger(callCost);
     }
 
     function profit() public view returns (uint256 _profit) {

@@ -23,7 +23,7 @@ def test_operation(
     # harvest
     strategy.harvest()
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
-    assert pytest.approx(strategy.estimatedTotalAssets(), rel=4 * 1e-3) == amount
+    assert pytest.approx(strategy.estimatedTotalAssets(), rel=10 * 1e-2) == amount
     chain.sleep(3600 * 24)
     underlying_vault_strategy.harvest({"from": underlying_vault_strategy_strategist})
     strategy.harvest()
